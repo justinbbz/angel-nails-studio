@@ -85,22 +85,23 @@
   if (reduce && pauseBtn) pauseBtn.hidden = true;
 
   /* ---------- horaires : ouvert / fermé (heure de Paris) ---------- */
-  const hoursData = JSON.parse($('#hours-data').textContent);
+  let hoursData = JSON.parse($('#hours-data').textContent);
   const JOURS = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
   const hm = (t) => { const [h, m] = t.split(':').map(Number); return h + ' h' + (m ? ' ' + String(m).padStart(2, '0') : ''); };
   const toMin = (t) => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
   const paris = (d = new Date()) => new Date(d.toLocaleString('en-US', { timeZone: 'Europe/Paris' }));
   const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const dateLongue = (d) => d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' }).replace(/^1 /, '1er ');
   function openStatus() {
     const now = paris(), cur = now.getHours() * 60 + now.getMinutes();
     const plages = hoursData.closed.includes(iso(now)) ? [] : (hoursData.h[now.getDay()] || []);
     for (const [a, b] of plages) if (cur >= toMin(a) && cur < toMin(b)) return { open: true, text: `Ouvert · jusqu’à ${hm(b)}` };
     const later = plages.find(([a]) => toMin(a) > cur);
     if (later) return { open: false, text: `Fermé · rouvre à ${hm(later[0])}` };
-    for (let i = 1; i <= 8; i++) {
+    for (let i = 1; i <= 90; i++) {
       const d = new Date(now); d.setDate(d.getDate() + i);
       const p = hoursData.closed.includes(iso(d)) ? [] : (hoursData.h[d.getDay()] || []);
-      if (p.length) return { open: false, text: `Fermé · rouvre ${i === 1 ? 'demain' : JOURS[d.getDay()]} à ${hm(p[0][0])}` };
+      if (p.length) return { open: false, text: `Fermé · rouvre ${i === 1 ? 'demain' : i <= 6 ? JOURS[d.getDay()] : 'le ' + dateLongue(d)} à ${hm(p[0][0])}` };
     }
     return { open: false, text: 'Fermé' };
   }
@@ -113,31 +114,30 @@
   }
   paintStatus(); setInterval(paintStatus, 60000);
 
-  /* ---------- carte : onglets + recherche ---------- */
-  const tablist = $('#tabs'), tabs = $$('.tab'), ind = $('.tabs__ind'), panels = $$('.panel');
-  let current = (tabs[0] || {}).dataset ? tabs[0].dataset.u : null;
+  /* ---------- carte : onglets + recherche (relançable : l'espace pro peut refaire la liste, voir carteRefaite) ---------- */
+  const tablist = $('#tabs'), ind = $('.tabs__ind'), q = $('#q'), qstatus = $('#qstatus'), qempty = $('#qempty');
+  const tabsL = () => $$('.tab', tablist), panelsL = () => $$('.panel');
+  let current = tabsL()[0] ? tabsL()[0].dataset.u : null;
   const moveInd = (t) => { if (!ind || !t) return; ind.style.width = t.offsetWidth + 'px'; ind.style.transform = `translateX(${t.offsetLeft}px)`; };
   function selectTab(id, { anim = true } = {}) {
     current = id;
-    tabs.forEach((t) => { const on = t.dataset.u === id; t.setAttribute('aria-selected', String(on)); t.tabIndex = on ? 0 : -1; if (on) { moveInd(t); tablist.scrollTo({ left: Math.max(0, t.offsetLeft - 24), behavior: reduce ? 'auto' : 'smooth' }); } });
-    panels.forEach((p) => { p.hidden = p.dataset.u !== id; });
+    tabsL().forEach((t) => { const on = t.dataset.u === id; t.setAttribute('aria-selected', String(on)); t.tabIndex = on ? 0 : -1; if (on) { moveInd(t); tablist.scrollTo({ left: Math.max(0, t.offsetLeft - 24), behavior: reduce ? 'auto' : 'smooth' }); } });
+    const panels = panelsL(); panels.forEach((p) => { p.hidden = p.dataset.u !== id; });
     const p = panels.find((x) => x.dataset.u === id);
     if (useG && anim && p) G.fromTo(p.querySelectorAll('.panel__head, .cat'), { y: 26, opacity: 0 }, { y: 0, opacity: 1, duration: .8, ease: 'power3.out', stagger: .07, overwrite: true, clearProps: 'transform,opacity' });
     ST && setTimeout(() => ST.refresh(), 60);
   }
-  tabs.forEach((t, i) => {
-    t.addEventListener('click', () => { if ($('#q').value) { $('#q').value = ''; runSearch(); } selectTab(t.dataset.u); });
-    t.addEventListener('keydown', (e) => {
-      const k = { ArrowRight: 1, ArrowLeft: -1 }[e.key]; let n = null;
-      if (k) n = (i + k + tabs.length) % tabs.length; else if (e.key === 'Home') n = 0; else if (e.key === 'End') n = tabs.length - 1;
-      if (n != null) { e.preventDefault(); tabs[n].focus(); tabs[n].click(); }
-    });
+  tablist && tablist.addEventListener('click', (e) => { const t = e.target.closest('.tab'); if (!t) return; if (q.value) { q.value = ''; runSearch(); } selectTab(t.dataset.u); });
+  tablist && tablist.addEventListener('keydown', (e) => {
+    const tabs = tabsL(), i = tabs.indexOf(e.target.closest('.tab')); if (i < 0) return;
+    const k = { ArrowRight: 1, ArrowLeft: -1 }[e.key]; let n = null;
+    if (k) n = (i + k + tabs.length) % tabs.length; else if (e.key === 'Home') n = 0; else if (e.key === 'End') n = tabs.length - 1;
+    if (n != null) { e.preventDefault(); tabs[n].focus(); tabs[n].click(); }
   });
-  $$('[data-open]').forEach((b) => b.addEventListener('click', () => { if ($('#q').value) { $('#q').value = ''; runSearch(); } selectTab(b.dataset.open, { anim: false }); scrollToEl('#prestations', -10); setTimeout(() => selectTab(b.dataset.open), 700); }));
-  const rows = $$('.svc'), q = $('#q'), qstatus = $('#qstatus'), qempty = $('#qempty');
+  document.addEventListener('click', (e) => { const b = e.target.closest('[data-open]'); if (!b) return; if (q.value) { q.value = ''; runSearch(); } selectTab(b.dataset.open, { anim: false }); scrollToEl('#prestations', -10); setTimeout(() => selectTab(b.dataset.open), 700); });
   function runSearch() {
     const tokens = norm(q.value).split(' ').filter(Boolean);
-    const on = tokens.length > 0;
+    const on = tokens.length > 0, rows = $$('.svc'), panels = panelsL();
     $('#prestations').classList.toggle('is-search', on);
     if (!on) { rows.forEach((r) => (r.hidden = false)); $$('.cat').forEach((c) => (c.hidden = false)); $$('.panel__head').forEach((h) => (h.hidden = false)); qempty.hidden = true; qstatus.textContent = ''; selectTab(current, { anim: false }); return; }
     let n = 0;
@@ -149,7 +149,15 @@
     ST && ST.refresh();
   }
   q && q.addEventListener('input', runSearch);
-  if (tabs[0]) { moveInd(tabs[0]); addEventListener('resize', () => moveInd(tabs.find((t) => t.getAttribute('aria-selected') === 'true'))); document.fonts && document.fonts.ready.then(() => moveInd(tabs.find((t) => t.getAttribute('aria-selected') === 'true'))); }
+  const reglerOnglets = () => { const t = tabsL().find((x) => x.getAttribute('aria-selected') === 'true') || tabsL()[0]; if (t) moveInd(t); };
+  if (tabsL()[0]) { reglerOnglets(); addEventListener('resize', reglerOnglets); document.fonts && document.fonts.ready.then(reglerOnglets); }
+  /* après un nouveau rendu de la carte (contenu publié depuis l'espace pro) : on garde l'onglet en cours et la recherche en cours */
+  function carteRefaite() {
+    const ids = tabsL().map((t) => t.dataset.u); if (!ids.length) return;
+    if (!ids.includes(current)) current = ids[0];
+    if (q && q.value) runSearch(); else selectTab(current, { anim: false });
+    attacherTilt();
+  }
 
   /* ---------- galerie : défilement à la souris, flèches, visionneuse ---------- */
   const rail = $('#rail');
@@ -164,12 +172,12 @@
     $('#rnext').addEventListener('click', () => rail.scrollBy({ left: step(), behavior: reduce ? 'auto' : 'smooth' }));
     rail.addEventListener('keydown', (e) => { if (e.key === 'ArrowRight') { e.preventDefault(); $('#rnext').click(); } if (e.key === 'ArrowLeft') { e.preventDefault(); $('#rprev').click(); } });
   }
-  const lb = $('#lb'), lbimg = $('#lbimg'), lbcap = $('#lbcap'), shots = $$('.shot');
+  const lb = $('#lb'), lbimg = $('#lbimg'), lbcap = $('#lbcap'), shotsL = () => $$('.shot');
   let lbi = 0, lbFrom = null;
-  function showShot(i) { lbi = (i + shots.length) % shots.length; const s = shots[lbi], im = s.querySelector('img'); lbimg.src = im.currentSrc || im.src; lbimg.alt = im.alt; lbcap.textContent = s.dataset.cap || ''; }
+  function showShot(i) { const shots = shotsL(); if (!shots.length) return; lbi = (i + shots.length) % shots.length; const s = shots[lbi], im = s.querySelector('img'); lbimg.src = im.currentSrc || im.src; lbimg.alt = im.alt; lbcap.textContent = s.dataset.cap || ''; }
   function openLb(i) { lbFrom = document.activeElement; showShot(i); lb.hidden = false; lenis && lenis.stop(); $('#lbclose').focus(); }
   function closeLb() { if (!lb || lb.hidden) return; lb.hidden = true; lenis && lenis.start(); lbFrom && lbFrom.focus && lbFrom.focus(); }
-  shots.forEach((s, i) => s.addEventListener('click', () => openLb(i)));
+  rail && rail.addEventListener('click', (e) => { const s = e.target.closest('.shot'); if (s) openLb(shotsL().indexOf(s)); });
   if (lb) {
     $('#lbclose').addEventListener('click', closeLb);
     $('#lbprev').addEventListener('click', () => showShot(lbi - 1));
@@ -264,13 +272,14 @@
     const bars = $('.bars'); bars && ST.create({ trigger: bars, start: 'top 90%', once: true, onEnter: () => bars.classList.add('is-in') });
     G.to('.hero__inner', { y: -70, opacity: .15, ease: 'none', scrollTrigger: { trigger: '.hero', start: 'top top', end: 'bottom 20%', scrub: true } });
     G.to('.hero__media', { scale: 1.08, ease: 'none', scrollTrigger: { trigger: '.hero', start: 'top top', end: 'bottom top', scrub: true } });
-    $$('.rev, .cat').forEach((c) => { c.addEventListener('pointermove', tilt); c.addEventListener('pointerleave', untilt); });
+    attacherTilt();
   }
   const fmt = (n, dec) => (dec ? n.toFixed(dec).replace('.', ',') : String(Math.round(n)));
   function setCount(el) { el.textContent = fmt(+el.dataset.count, +el.dataset.dec || 0); }
   function countUp(el) { const end = +el.dataset.count, dec = +el.dataset.dec || 0, o = { v: 0 }; G.to(o, { v: end, duration: 2, ease: 'power2.out', onUpdate: () => (el.textContent = fmt(o.v, dec)), onComplete: () => setCount(el) }); }
   function tilt(e) { if (!fine || e.pointerType === 'touch') return; const c = e.currentTarget, r = c.getBoundingClientRect(); const x = (e.clientX - r.left) / r.width - .5, y = (e.clientY - r.top) / r.height - .5; G.to(c, { rotateY: x * 5, rotateX: -y * 4, transformPerspective: 900, duration: .6, ease: 'power3.out' }); }
   function untilt(e) { G.to(e.currentTarget, { rotateX: 0, rotateY: 0, duration: .8, ease: 'power3.out' }); }
+  function attacherTilt() { if (!useG) return; $$('.rev, .cat').forEach((c) => { if (c.dataset.tilt) return; c.dataset.tilt = '1'; c.addEventListener('pointermove', tilt); c.addEventListener('pointerleave', untilt); }); }
 
   /* ---------- entrée en scène ---------- */
   const heroParts = $$('[data-hero]');
@@ -286,7 +295,10 @@
   }
   const pre = $('#pre');
   function finish() { initReveals(); if (ST) ST.refresh(); }
-  if (pre && useG) {
+  /* interface pour assets/js/pro-live.js (contenu publié depuis l'espace pro) */
+  window.ANS = { reduce, useG, heures(d) { hoursData = d; paintStatus(); }, carteRefaite, refresh() { ST && ST.refresh(); }, nombres(n) { $$('[data-nbpresta]').forEach((el) => { el.dataset.count = n; el.textContent = n; }); } };
+  const apercu = /[?&]apercu=1/.test(location.search) && window.parent !== window;     // volet d'aperçu de l'espace pro : pas de rideau
+  if (pre && useG && !apercu) {
     const logo = $('.pre__logo'), bar = $('.pre__bar i');
     G.to(logo, { opacity: 1, y: 0, scale: 1, duration: 1, ease: 'power3.out', delay: .1 });
     G.to(bar, { scaleX: 1, duration: 1.5, ease: 'power2.inOut', delay: .2 });
@@ -301,5 +313,6 @@
   } else {
     if (pre) pre.remove();
     finish();
+    if (apercu) setTimeout(heroIntro, 100);
   }
 })();
