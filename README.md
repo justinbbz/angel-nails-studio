@@ -1,5 +1,5 @@
-# Angel Nails Studio : maquette de site (démonstration non officielle)
+# Angel Nails Studio · site créé par vocaliz-ia.com
 
-Proposition de site pour Angel Nails Studio (Manosque), réalisée à partir des informations publiques de sa page Planity et de sa fiche Google. Ce n'est pas le site officiel de l'établissement. Aucun rendez-vous ni paiement n'est géré ici : la réservation se fait sur Planity.
+Site d'Angel Nails Studio (Manosque), réalisé par vocaliz-ia.com (https://vocaliz-ia.com). Aucun rendez-vous ni paiement n'est géré ici : la réservation se fait sur Planity.
 
-Aperçu : https://justinbbz.github.io/angel-nails-studio/
+Site : https://angelnailsstudio.fr/
