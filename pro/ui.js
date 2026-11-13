@@ -57,8 +57,8 @@ export function icone(nom, taille = 20) {
 }
 
 /* bouton : bouton({ texte, icone, classe, onclick, titre }) */
-export function bouton({ texte, ic, classe = '', onclick, titre, type = 'button', disabled = false, aria } = {}) {
-  return h('button', { type, class: 'btn ' + classe, title: titre, disabled, 'aria-label': aria, on: onclick ? { click: onclick } : undefined }, ic ? icone(ic, 18) : null, texte ? h('span', { text: texte }) : null);
+export function bouton({ texte, ic, classe = '', onclick, titre, type = 'button', disabled = false, aria, classeTexte = '' } = {}) {
+  return h('button', { type, class: 'btn ' + classe, title: titre, disabled, 'aria-label': aria, on: onclick ? { click: onclick } : undefined }, ic ? icone(ic, 18) : null, texte ? h('span', { class: ('btn__t ' + classeTexte).trim(), text: texte }) : null);
 }
 
 /* messages brefs (annoncés aux lecteurs d'écran) */
@@ -68,6 +68,17 @@ export function toast(message, type = 'ok', duree = 4500) {
   zone.append(t); setTimeout(() => t.remove(), duree);
 }
 
+/* Sur téléphone, le clavier à l'écran réduit la zone visible sans réduire la page : on suit la zone réellement visible (visualViewport)
+   pour que le bas de la fenêtre (boutons Enregistrer…) ne passe pas sous le clavier. Sans visualViewport, la fenêtre garde sa hauteur normale. */
+let oublierClavier = null;
+function suivreClavier() {
+  const vv = window.visualViewport; if (!vv) return null;
+  const racine = document.documentElement;
+  const maj = () => { racine.style.setProperty('--vv-hauteur', Math.round(vv.height) + 'px'); racine.style.setProperty('--vv-haut', Math.round(vv.offsetTop) + 'px'); };
+  maj(); vv.addEventListener('resize', maj); vv.addEventListener('scroll', maj);
+  return () => { vv.removeEventListener('resize', maj); vv.removeEventListener('scroll', maj); racine.style.removeProperty('--vv-hauteur'); racine.style.removeProperty('--vv-haut'); };
+}
+
 /* fenêtre modale accessible (focus piégé, Échap, retour du focus) */
 let pileModales = 0;
 export function modale({ titre, contenu, boutons = [], large = false, onfermer, id }) {
@@ -75,11 +86,11 @@ export function modale({ titre, contenu, boutons = [], large = false, onfermer, 
   const fond = h('div', { class: 'modale-fond' });
   const idTitre = 'mt' + Math.random().toString(36).slice(2, 8);
   const boite = h('div', { class: 'modale' + (large ? ' modale--large' : ''), role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': idTitre, tabindex: '-1', id });
-  const fermer = (valeur) => { if (!fond.isConnected) return; fond.remove(); pileModales--; if (!pileModales) document.body.classList.remove('modale-ouverte'); document.removeEventListener('keydown', clavier, true); ancien && ancien.focus && ancien.focus(); onfermer && onfermer(valeur); };
+  const fermer = (valeur) => { if (!fond.isConnected) return; fond.remove(); pileModales--; if (!pileModales) { document.body.classList.remove('modale-ouverte'); if (oublierClavier) { oublierClavier(); oublierClavier = null; } } document.removeEventListener('keydown', clavier, true); ancien && ancien.focus && ancien.focus(); onfermer && onfermer(valeur); };
   const entete = h('div', { class: 'modale__tete' }, h('h2', { id: idTitre, text: titre }), h('button', { type: 'button', class: 'btn btn--rond btn--discret', 'aria-label': 'Fermer', on: { click: () => fermer(undefined) } }, icone('croix', 18)));
   const corps = h('div', { class: 'modale__corps' });
   const pied = boutons.length ? h('div', { class: 'modale__pied' }, boutons) : null;
-  boite.append(entete, corps, pied); fond.append(boite);
+  boite.append(entete, corps); if (pied) boite.append(pied); fond.append(boite);   // (append(null) écrirait le texte « null »)
   const clavier = (e) => {
     if (!fond.isConnected || fond !== [...document.querySelectorAll('.modale-fond')].pop()) return;
     if (e.key === 'Escape') { e.stopPropagation(); fermer(undefined); return; }
@@ -91,9 +102,11 @@ export function modale({ titre, contenu, boutons = [], large = false, onfermer, 
   };
   fond.addEventListener('mousedown', (e) => { if (e.target === fond) fermer(undefined); });
   document.addEventListener('keydown', clavier, true);
-  document.body.append(fond); pileModales++; document.body.classList.add('modale-ouverte');
+  document.body.append(fond); pileModales++; document.body.classList.add('modale-ouverte'); if (!oublierClavier) oublierClavier = suivreClavier();
   contenu && contenu(corps, fermer);
-  const premier = corps.querySelector('input:not([type=hidden]),select,textarea') || boite; setTimeout(() => premier.focus(), 30);
+  /* au toucher, ne pas ouvrir le clavier d'office : on met le focus sur la fenêtre elle-même ; à la souris, sur le premier champ */
+  const tactile = window.matchMedia && matchMedia('(pointer:coarse)').matches;
+  const premier = (!tactile && corps.querySelector('input:not([type=hidden]),select,textarea')) || boite; setTimeout(() => premier.focus(), 30);
   return { fermer, corps, boite };
 }
 export function confirmer({ titre, texte, ok = 'Confirmer', annuler = 'Annuler', danger = false, details }) {

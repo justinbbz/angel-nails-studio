@@ -86,15 +86,16 @@ function navItem(v, mobile) {
 }
 function demarrerCoque() {
   racine.replaceChildren();
-  const bascule = bouton({ texte: 'Aperçu', ic: 'ecran', classe: 'btn--clair btn--petit', onclick: () => { apercu.basculer(coque); majApercuBouton(); if (apercu.estOuvert()) apercu.synchroniser(); } });
+  const bascule = bouton({ texte: 'Aperçu', ic: 'ecran', classe: 'btn--clair btn--petit btn--apercu', onclick: () => { apercu.basculer(coque); majApercuBouton(); if (apercu.estOuvert()) apercu.synchroniser(); } });
   bascule.id = 'bouton-apercu';
+  /* téléphone : Aperçu + menu (Historique, Mon compte, Voir le site, Déconnexion) ; ordinateur : le menu de gauche remplace le bouton de menu */
+  const menu = bouton({ ic: 'menu', classe: 'btn--clair btn--rond haut__menu', aria: 'Menu', onclick: menuPlus }); menu.id = 'bouton-menu'; menu.setAttribute('aria-haspopup', 'dialog');
   const haut = h('header', { class: 'haut' },
-    h('a', { class: 'haut__marque', href: '#/accueil', 'aria-label': 'Espace pro, retour à l’accueil' }, h('span', { class: 'logo-mot', role: 'img', 'aria-label': 'Angel Nails Studio' }), h('span', { class: 'haut__pro', text: 'Espace pro' })),
-    h('div', { class: 'haut__actions' }, bascule, h('a', { class: 'btn btn--clair btn--petit', href: '../index.html', target: '_blank', rel: 'noopener' }, icone('externe', 18), h('span', { text: 'Voir le site' }), h('span', { class: 'sr', text: ' (nouvel onglet)' }))));
+    h('a', { class: 'haut__marque', href: '#/accueil', 'aria-label': 'Espace pro, retour à l’accueil' }, h('span', { class: 'logo-mot', role: 'img', 'aria-label': 'Angel Nails Studio' }), h('span', { class: 'haut__pro' }, h('span', { class: 'haut__pro-mot', text: 'Espace ' }), 'pro')),
+    h('div', { class: 'haut__actions' }, bascule, h('a', { class: 'btn btn--clair btn--petit haut__site', href: '../index.html', target: '_blank', rel: 'noopener' }, icone('externe', 18), h('span', { class: 'btn__t', text: 'Voir le site' }), h('span', { class: 'sr', text: ' (nouvel onglet)' })), menu));
   const lateral = h('nav', { class: 'nav', 'aria-label': 'Navigation de l’espace pro' }, h('div', { class: 'nav__liste' }, TOUTES.map((v) => navItem(v, false))),
     h('div', { class: 'nav__bas' }, bouton({ texte: 'Se déconnecter', ic: 'sortie', classe: 'btn--discret btn--plein', onclick: sortir })));
-  const bas = h('nav', { class: 'nav-bas', 'aria-label': 'Navigation de l’espace pro' }, VUES.map((v) => navItem(v, true)),
-    h('button', { type: 'button', class: 'nav__lien', id: 'nav-plus', 'aria-haspopup': 'dialog', on: { click: menuPlus } }, icone('menu', 22), h('span', { text: 'Plus' })));
+  const bas = h('nav', { class: 'nav-bas', 'aria-label': 'Navigation de l’espace pro' }, VUES.map((v) => navItem(v, true)));
   principal = h('main', { class: 'principal', id: 'principal', tabindex: '-1' });
   barre = h('div', { class: 'barre-pub', hidden: true, role: 'region', 'aria-label': 'Publication des modifications' });
   coque = h('div', { class: 'coque' }, haut, lateral, principal, barre, bas);
@@ -102,10 +103,9 @@ function demarrerCoque() {
   majBarre(); montrer();
 }
 function menuPlus() {
-  const m = modale({ titre: 'Plus', contenu: (c) => { c.append(h('div', { class: 'liste-menu' },
+  const m = modale({ titre: 'Menu', contenu: (c) => { c.append(h('div', { class: 'liste-menu' },
     PLUS.map((v) => h('a', { class: 'liste-menu__lien', href: '#/' + v.id, on: { click: () => m.fermer() } }, icone(v.ic, 22), h('span', { text: v.nom }))),
-    h('button', { type: 'button', class: 'liste-menu__lien', on: { click: () => { m.fermer(); coque.querySelector('#bouton-apercu').click(); } } }, icone('ecran', 22), h('span', { text: 'Aperçu du site' })),
-    h('a', { class: 'liste-menu__lien', href: '../index.html', target: '_blank', rel: 'noopener' }, icone('externe', 22), h('span', { text: 'Voir le site' })),
+    h('a', { class: 'liste-menu__lien', href: '../index.html', target: '_blank', rel: 'noopener', on: { click: () => m.fermer() } }, icone('externe', 22), h('span', { text: 'Voir le site' }), h('span', { class: 'sr', text: ' (nouvel onglet)' })),
     h('button', { type: 'button', class: 'liste-menu__lien', on: { click: () => { m.fermer(); sortir(); } } }, icone('sortie', 22), h('span', { text: 'Se déconnecter' })))); } });
 }
 async function sortir() {
@@ -144,7 +144,7 @@ function majBarre() {
   if (!sale) { barre.replaceChildren(); document.title = document.title.replace(/^• /, ''); return; }
   if (!document.title.startsWith('• ')) document.title = '• ' + document.title;
   barre.replaceChildren(h('p', { class: 'barre-pub__texte' }, h('strong', { text: 'Modifications non publiées' }), h('span', { text: resumeModifs(S.base, S.doc) || ' ' })),
-    h('div', { class: 'barre-pub__actions' }, bouton({ texte: 'Annuler', classe: 'btn--clair', onclick: annulerModifs }), bouton({ texte: 'Publier', ic: 'envoyer', classe: 'btn--or', onclick: publier })));
+    h('div', { class: 'barre-pub__actions' }, bouton({ texte: 'Annuler', ic: 'croix', classe: 'btn--clair btn--annuler', classeTexte: 'btn__t--annuler', onclick: annulerModifs }), bouton({ texte: 'Publier', ic: 'envoyer', classe: 'btn--or', onclick: publier })));
 }
 async function annulerModifs() {
   if (!(await confirmer({ titre: 'Annuler toutes les modifications ?', texte: 'Le site et votre espace pro reviennent à la dernière version publiée. Vos modifications non publiées seront perdues.', ok: 'Oui, annuler', danger: true }))) return;
