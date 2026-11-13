@@ -7,6 +7,7 @@
   const fine = matchMedia('(hover:hover) and (pointer:fine)').matches;
   const root = document.documentElement;
   root.classList.add('js');
+  const apercu = /[?&]apercu=1/.test(location.search) && window.parent !== window;     // volet d'aperçu de l'espace pro : pas de rideau, pas de film
   const G = window.gsap, ST = window.ScrollTrigger;
   const useG = !!(G && ST) && !reduce;
   if (G && ST) G.registerPlugin(ST);
@@ -40,14 +41,17 @@
 
   /* ---------- en-tête, barre mobile, progression ---------- */
   const hdr = $('#hdr'), dock = $('#dock'), prog = $('#progress i');
-  const onScroll = () => {
+  let attendScroll = false;
+  const majScroll = () => {
+    attendScroll = false;
     const y = window.scrollY;
     hdr.classList.toggle('is-solid', y > 40);
     dock && dock.classList.toggle('is-on', y > 480);
     const h = document.documentElement.scrollHeight - innerHeight;
     prog && (prog.style.transform = `scaleX(${h > 0 ? Math.min(1, y / h) : 0})`);
   };
-  addEventListener('scroll', onScroll, { passive: true }); onScroll();
+  const onScroll = () => { if (!attendScroll) { attendScroll = true; requestAnimationFrame(majScroll); } };   // une seule mise à jour par image, même si le doigt envoie plus d'événements
+  addEventListener('scroll', onScroll, { passive: true }); majScroll();
   const links = $$('.hdr__nav a');
   const secs = links.map((a) => $(a.getAttribute('href'))).filter(Boolean);
   if ('IntersectionObserver' in window) {
@@ -61,20 +65,24 @@
   const mqMobile = matchMedia('(max-width:760px), (max-aspect-ratio:4/5)');
   const wantPlay = () => !userPaused && heroVisible && !document.hidden;
   const syncFilm = () => { if (!film || reduce) return; wantPlay() ? film.play().catch(() => {}) : film.pause(); };
+  /* Le film (3 Mo sur téléphone) ne se charge qu'APRÈS l'ouverture du rideau, pour que les polices et l'image de départ aient toute la bande passante ;
+     avec l'économiseur de données ou en 2G/3G, ou dans le volet d'aperçu de l'espace pro, on garde l'image fixe (c'est déjà l'image de fond du héros). */
+  const cnx = navigator.connection || {};
+  const reseauLent = !!cnx.saveData || /(^|-)2g$|^3g$/.test(cnx.effectiveType || '');
+  let filmDemarre = false;
+  const demarrerFilm = () => { filmDemarre = true; loadFilm(); };
   function loadFilm() {
-    if (!film || reduce) return;
+    if (!film || reduce || !filmDemarre || reseauLent || apercu) return;
     const m = mqMobile.matches, src = m ? film.dataset.srcM : film.dataset.srcD;
     if (film.dataset.cur === src) return;
     film.dataset.cur = src; film.classList.remove('is-ready');
-    film.poster = m ? film.dataset.posterM : 'assets/img/hero-poster.webp';
-    film.src = src; film.load();
+    film.preload = 'auto'; film.src = src; film.load();
   }
   if (film && !reduce) {
     film.addEventListener('canplay', () => { film.classList.add('is-ready'); syncFilm(); });
     mqMobile.addEventListener('change', loadFilm);
     document.addEventListener('visibilitychange', syncFilm);
     new IntersectionObserver((es) => { heroVisible = es[0].isIntersecting; syncFilm(); }, { threshold: 0.05 }).observe($('#accueil'));
-    loadFilm();
   }
   pauseBtn && pauseBtn.addEventListener('click', () => {
     userPaused = !userPaused;
@@ -183,6 +191,11 @@
     $('#lbprev').addEventListener('click', () => showShot(lbi - 1));
     $('#lbnext').addEventListener('click', () => showShot(lbi + 1));
     lb.addEventListener('click', (e) => { if (e.target === lb) closeLb(); });
+    /* au doigt : glisser à gauche / à droite = photo suivante / précédente, vers le bas = fermer */
+    let tx = 0, ty = 0, suit = false;
+    lb.addEventListener('touchstart', (e) => { suit = e.touches.length === 1; if (suit) { tx = e.touches[0].clientX; ty = e.touches[0].clientY; } }, { passive: true });
+    lb.addEventListener('touchend', (e) => { if (!suit) return; suit = false; const t = e.changedTouches[0], dx = t.clientX - tx, dy = t.clientY - ty;
+      if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) showShot(lbi + (dx < 0 ? 1 : -1)); else if (dy > 90 && dy > Math.abs(dx) * 1.5) closeLb(); }, { passive: true });
     document.addEventListener('keydown', (e) => { if (lb.hidden) return; if (e.key === 'ArrowLeft') showShot(lbi - 1); if (e.key === 'ArrowRight') showShot(lbi + 1); if (e.key === 'Tab') { const f = $$('button', lb); const first = f[0], last = f[f.length - 1]; if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); } else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); } } });
   }
 
@@ -201,6 +214,15 @@
     [...clone.children].forEach((c) => { tr.appendChild(c); });
     $$('a,button', tr).forEach((x) => { if (x.closest('[aria-hidden="true"]')) x.tabIndex = -1; });
   });
+
+  /* avis : sur téléphone (ou mouvement réduit) chaque rangée se fait défiler à la main ; elle doit aussi se faire défiler au clavier (flèches) */
+  const mqAvis = matchMedia('(max-width:760px)');
+  const rangeesAvis = $$('.marq__row');
+  const rendreAvisDefilables = () => rangeesAvis.forEach((r, i) => {
+    if (mqAvis.matches || reduce) { r.tabIndex = 0; r.setAttribute('role', 'group'); r.setAttribute('aria-label', `Avis clients, rangée ${i + 1} sur ${rangeesAvis.length} : faites défiler avec les flèches`); }
+    else { r.removeAttribute('tabindex'); r.removeAttribute('role'); r.removeAttribute('aria-label'); }
+  });
+  rendreAvisDefilables(); mqAvis.addEventListener('change', rendreAvisDefilables);
 
   /* ---------- poussière d'or (appel final) ---------- */
   const cv = $('#dust');
@@ -297,22 +319,29 @@
   function finish() { initReveals(); if (ST) ST.refresh(); }
   /* interface pour assets/js/pro-live.js (contenu publié depuis l'espace pro) */
   window.ANS = { reduce, useG, heures(d) { hoursData = d; paintStatus(); }, carteRefaite, refresh() { ST && ST.refresh(); }, nombres(n) { $$('[data-nbpresta]').forEach((el) => { el.dataset.count = n; el.textContent = n; }); } };
-  const apercu = /[?&]apercu=1/.test(location.search) && window.parent !== window;     // volet d'aperçu de l'espace pro : pas de rideau
   if (pre && useG && !apercu) {
     const logo = $('.pre__logo'), bar = $('.pre__bar i');
     G.to(logo, { opacity: 1, y: 0, scale: 1, duration: 1, ease: 'power3.out', delay: .1 });
-    G.to(bar, { scaleX: 1, duration: 1.5, ease: 'power2.inOut', delay: .2 });
-    const minTime = new Promise((r) => setTimeout(r, 1700));
-    const loaded = new Promise((r) => (document.readyState === 'complete' ? r() : addEventListener('load', r, { once: true })));
+    const court = mqMobile.matches;     // téléphone : rideau un peu plus bref (1,3 s au lieu de 1,7 s au minimum)
+    G.to(bar, { scaleX: 1, duration: court ? 1.1 : 1.5, ease: 'power2.inOut', delay: .2 });
+    const minTime = new Promise((r) => setTimeout(r, court ? 1300 : 1700));
     const fonts = document.fonts ? document.fonts.ready : Promise.resolve();
-    Promise.race([Promise.all([minTime, loaded, fonts]), new Promise((r) => setTimeout(r, 6000))]).then(() => {
+    /* l'image de départ du héros (même adresse que l'image de fond : une seule requête) */
+    const depart = new Promise((r) => { const im = new Image(); im.onload = im.onerror = () => r(); im.src = mqMobile.matches ? 'assets/img/hero-poster-mobile.webp' : 'assets/img/hero-poster.webp'; setTimeout(r, 2500); });
+    /* le rideau n'attend plus « toute la page » (images en avance, vidéo) : sur une connexion lente il restait fermé 6 à 9 s ; plafond 3,5 s */
+    const critiques = Promise.all([fonts, depart]);
+    critiques.then(demarrerFilm);       // le film part dès que polices et image de départ sont là : il est prêt quand le rideau se lève, sans leur voler la bande passante
+    Promise.race([Promise.all([minTime, critiques]), new Promise((r) => setTimeout(r, 3500))]).then(() => {
       finish();
       G.to(pre, { yPercent: -100, duration: 1.15, ease: 'power4.inOut', onComplete: () => pre.remove() });
       setTimeout(heroIntro, 650);
+      demarrerFilm();
     });
   } else {
     if (pre) pre.remove();
     finish();
     if (apercu) setTimeout(heroIntro, 100);
+    demarrerFilm();
   }
+  addEventListener('load', () => { ST && ST.refresh(); }, { once: true });
 })();
