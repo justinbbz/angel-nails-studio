@@ -5,6 +5,7 @@ import { S, notifier, idNeuf, copie } from '../etat.js';
 import { api, urlImage } from '../api.js';
 
 const MAX = 1600, LIMITE = 2300 * 1024;
+let organiser = false;   // téléphone : les flèches de déplacement ne s'affichent que dans ce mode
 const R = window.ANSRendu;
 
 /* lit un fichier image, le réduit, le compresse en JPEG ; renvoie un Blob et ses dimensions */
@@ -78,11 +79,12 @@ export function rendre(el, ctx) {
     if (ajoutees) { ctx.rerendre(); toast(`${ajoutees} photo${ajoutees > 1 ? 's ajoutées' : ' ajoutée'} au début de la galerie. Ajoutez une description à chacune.`); }
   } } });
   el.append(h('header', { class: 'page-tete page-tete--actions' }, h('div', null, h('h1', { text: 'Photos' }), h('p', { class: 'page-tete__sous', text: 'Vos réalisations s’affichent dans l’ordre ci-dessous : la première photo est la première que voient vos clientes.' })),
-    h('div', { class: 'page-tete__boutons' }, h('label', { class: 'btn btn--or', for: 'ajout-photos' }, icone('plus', 18), h('span', { text: 'Ajouter des photos' })), champFichier)));
+    h('div', { class: 'page-tete__boutons' }, h('label', { class: 'btn btn--or', for: 'ajout-photos' }, icone('plus', 18), h('span', { class: 'btn__t', text: 'Ajouter des photos' })), champFichier,
+      h('button', { type: 'button', class: 'btn btn-organiser ' + (organiser ? 'btn--bleu' : 'btn--clair'), 'aria-pressed': String(organiser), on: { click: () => { organiser = !organiser; ctx.rerendre(); } } }, icone(organiser ? 'ok' : 'gauche', 18), h('span', { class: 'btn__t', text: organiser ? 'Terminé' : 'Changer l’ordre' })))));
   const manquantes = g.filter((p) => !p.alt).length;
   el.append(h('section', { class: 'carte-ui', 'aria-labelledby': 'h-galerie' }, h('h2', { id: 'h-galerie', text: `Galerie « Réalisations » (${g.length})` }),
     manquantes ? h('p', { class: 'pastille pastille--alerte' }, icone('alerte', 14), ` ${manquantes} photo${manquantes > 1 ? 's' : ''} sans description : ouvrez-les pour en ajouter une (accessibilité et référencement).`) : null,
-    g.length ? h('ul', { class: 'grille-photos' }, g.map((p, i) => tuile(p, i, g, refaire))) : h('p', { class: 'vide', text: 'La galerie est vide. Ajoutez vos premières photos.' })));
+    g.length ? h('ul', { class: 'grille-photos' + (organiser ? ' est-organiser' : '') }, g.map((p, i) => tuile(p, i, g, refaire))) : h('p', { class: 'vide', text: 'La galerie est vide. Ajoutez vos premières photos.' })));
   el.append(h('section', { class: 'carte-ui', 'aria-labelledby': 'h-pages' }, h('h2', { id: 'h-pages', text: 'Photos des pages' }), h('p', { class: 'champ__aide', text: 'Les grandes photos du site : la présentation du studio et le haut de chaque onglet de prestations.' }),
     h('ul', { class: 'grille-pages' },
       PAGES.map(([cle, nom]) => emplacement(nom, S.doc.studio.photos[cle], (p) => { S.doc.studio.photos[cle] = p; refaire(); })),
@@ -103,8 +105,8 @@ function tuile(p, i, liste, refaire) {
     h('button', { type: 'button', class: 'tuile__img', 'aria-label': `Modifier la photo « ${p.court} »`, on: { click: () => modifierPhoto(p, liste, refaire) } }, h('img', { src: urlImage(p.src), alt: p.alt || '', width: 200, height: 200, loading: 'lazy' }), p.visible === false ? h('span', { class: 'tuile__masque' }, icone('oeil-barre', 22)) : null, !p.alt ? h('span', { class: 'tuile__alerte', title: 'Description manquante' }, icone('alerte', 16)) : null),
     h('div', { class: 'tuile__pied' }, h('span', { class: 'tuile__nom', text: p.court }),
       h('span', { class: 'actions-ligne' },
-        bouton({ ic: 'gauche', classe: 'btn--rond btn--discret btn--petit', aria: `Déplacer ${p.court} vers le début`, disabled: i === 0, onclick: () => bouger(-1) }),
-        bouton({ ic: 'droite', classe: 'btn--rond btn--discret btn--petit', aria: `Déplacer ${p.court} vers la fin`, disabled: i === liste.length - 1, onclick: () => bouger(1) }))));
+        bouton({ ic: 'gauche', classe: 'btn--rond btn--discret btn--petit btn--org', aria: `Déplacer ${p.court} vers le début`, disabled: i === 0, onclick: () => bouger(-1) }),
+        bouton({ ic: 'droite', classe: 'btn--rond btn--discret btn--petit btn--org', aria: `Déplacer ${p.court} vers la fin`, disabled: i === liste.length - 1, onclick: () => bouger(1) }))));
 }
 
 function modifierPhoto(p, liste, refaire) {

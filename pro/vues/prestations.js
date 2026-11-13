@@ -4,7 +4,7 @@ import { S, notifier, idNeuf, services, chercher, copie } from '../etat.js';
 import { urlImage } from '../api.js';
 import { choisirPhoto } from './photos.js';
 const R = window.ANSRendu;
-let courant = null, recherche = '';
+let courant = null, recherche = '', organiser = false;   // « organiser » : sur téléphone, monter / descendre / masquer ne s'affichent que dans ce mode
 
 const duree = (m) => (m ? R.duree(m) : '');
 const universDe = (id) => S.doc.univers.find((u) => u.id === id);
@@ -19,11 +19,12 @@ export function rendre(el, ctx) {
   const refaire = () => { notifier(); ctx.rerendre(); };
 
   el.append(h('header', { class: 'page-tete page-tete--actions' }, h('div', null, h('h1', { text: 'Prestations' }), h('p', { class: 'page-tete__sous', text: 'Modifiez un prix directement dans la liste, ou ouvrez une prestation pour tout changer.' })),
-    h('div', { class: 'page-tete__boutons' }, bouton({ texte: 'Ajuster les prix', ic: 'prestations', classe: 'btn--clair', onclick: () => ajusterPrix(refaire) }), bouton({ texte: 'Nouvel onglet', ic: 'plus', classe: 'btn--clair', onclick: () => modifierUnivers(null, ctx, refaire) }))));
+    h('div', { class: 'page-tete__boutons' }, bouton({ texte: 'Ajuster les prix', ic: 'prestations', classe: 'btn--clair', onclick: () => ajusterPrix(refaire) }), bouton({ texte: 'Nouvel onglet', ic: 'plus', classe: 'btn--clair', onclick: () => modifierUnivers(null, ctx, refaire) }),
+      h('button', { type: 'button', class: 'btn btn-organiser ' + (organiser ? 'btn--bleu' : 'btn--clair'), 'aria-pressed': String(organiser), on: { click: () => { organiser = !organiser; ctx.rerendre(); } } }, icone(organiser ? 'ok' : 'haut', 18), h('span', { class: 'btn__t', text: organiser ? 'Terminé' : 'Changer l’ordre' })))));
 
   const champRecherche = h('input', { type: 'search', class: 'recherche__champ', placeholder: 'Rechercher une prestation…', value: recherche, autocomplete: 'off', 'aria-label': 'Rechercher une prestation', on: { input: (e) => { recherche = e.target.value; const pos = e.target.selectionStart; rerenduRecherche(); } } });
   el.append(h('div', { class: 'recherche' }, icone('prestations', 18), champRecherche));
-  const zone = h('div', { class: 'zone-prestations' });
+  const zone = h('div', { class: 'zone-prestations' + (organiser ? ' est-organiser' : '') });
   el.append(zone);
 
   function rerenduRecherche() { zone.replaceChildren(); remplir(); }
@@ -35,11 +36,16 @@ export function rendre(el, ctx) {
         trouves.length ? h('div', { class: 'carte-ui carte-ui--liste' }, h('ul', { class: 'lignes' }, trouves.map((x) => ligne(x, effectif, refaire, true)))) : null);
       return;
     }
-    zone.append(h('div', { class: 'onglets', role: 'tablist', 'aria-label': 'Univers de prestations' }, doc.univers.map((u) => {
+    const barreOnglets = h('div', { class: 'onglets', role: 'tablist', 'aria-label': 'Univers de prestations' }, doc.univers.map((u) => {
       const n = ids(u).length;
       return h('button', { type: 'button', role: 'tab', class: 'onglet' + (u.id === courant ? ' est-actif' : ''), 'aria-selected': String(u.id === courant), on: { click: () => { courant = u.id; ctx.rerendre(); } } },
         h('span', { text: u.court }), h('small', { text: String(n) }), u.visible === false ? icone('oeil-barre', 14) : null);
-    })));
+    }));
+    zone.append(barreOnglets);
+    /* téléphone : la ligne d'onglets défile ; on la recentre sur l'onglet actif et on estompe le bord où il en reste (voir .onglets dans pro.css) */
+    const fondu = () => { const max = barreOnglets.scrollWidth - barreOnglets.clientWidth, x = barreOnglets.scrollLeft; barreOnglets.style.setProperty('--fond-g', x > 4 ? '28px' : '0px'); barreOnglets.style.setProperty('--fond-d', max > 4 && x < max - 4 ? '28px' : '0px'); };
+    barreOnglets.addEventListener('scroll', fondu, { passive: true });
+    requestAnimationFrame(() => { const actif = barreOnglets.querySelector('.est-actif'); if (actif && barreOnglets.scrollWidth > barreOnglets.clientWidth) barreOnglets.scrollLeft = actif.getBoundingClientRect().left - barreOnglets.getBoundingClientRect().left + barreOnglets.scrollLeft - (barreOnglets.clientWidth - actif.offsetWidth) / 2; fondu(); });
     zone.append(panneau(universDe(courant)));
   }
 
@@ -62,8 +68,8 @@ export function rendre(el, ctx) {
       h('header', { class: 'categorie__tete' },
         h('div', { class: 'categorie__titre' }, h('h3', { text: c.titre }), h('span', { class: 'categorie__n', text: `${c.services.length} prestation${c.services.length > 1 ? 's' : ''}` + (c.visible === false ? ' · catégorie masquée' : '') })),
         h('div', { class: 'actions-ligne' },
-          bouton({ ic: 'haut', classe: 'btn--rond btn--discret', aria: `Monter la catégorie ${c.titre}`, disabled: i === 0, onclick: () => { bouger(u.categories, i, -1); refaire(); } }),
-          bouton({ ic: 'bas', classe: 'btn--rond btn--discret', aria: `Descendre la catégorie ${c.titre}`, disabled: i === u.categories.length - 1, onclick: () => { bouger(u.categories, i, 1); refaire(); } }),
+          bouton({ ic: 'haut', classe: 'btn--rond btn--discret btn--org', aria: `Monter la catégorie ${c.titre}`, disabled: i === 0, onclick: () => { bouger(u.categories, i, -1); refaire(); } }),
+          bouton({ ic: 'bas', classe: 'btn--rond btn--discret btn--org', aria: `Descendre la catégorie ${c.titre}`, disabled: i === u.categories.length - 1, onclick: () => { bouger(u.categories, i, 1); refaire(); } }),
           bouton({ ic: 'crayon', classe: 'btn--rond btn--discret', aria: `Modifier la catégorie ${c.titre}`, onclick: () => modifierCategorie(u, c, refaire) }))),
       c.note ? h('p', { class: 'categorie__note', text: c.note }) : null,
       h('ul', { class: 'lignes' }, c.services.map((s) => ligne({ u, c, s }, effectif, refaire, false))),
@@ -81,8 +87,8 @@ export function rendre(el, ctx) {
       h('div', { class: 'ligne__duree', text: duree(s.duree) }),
       h('label', { class: 'ligne__prixbloc' }, prix, h('span', { text: '€', 'aria-hidden': 'true' })),
       h('div', { class: 'actions-ligne' },
-        avecChemin ? null : [bouton({ ic: 'haut', classe: 'btn--rond btn--discret', aria: `Monter ${s.nom}`, disabled: i === 0, onclick: () => { bouger(liste, i, -1); refaire(); } }), bouton({ ic: 'bas', classe: 'btn--rond btn--discret', aria: `Descendre ${s.nom}`, disabled: i === liste.length - 1, onclick: () => { bouger(liste, i, 1); refaire(); } })],
-        bouton({ ic: s.visible === false ? 'oeil-barre' : 'oeil', classe: 'btn--rond btn--discret', aria: s.visible === false ? `Afficher ${s.nom} sur le site` : `Masquer ${s.nom} du site`, titre: s.visible === false ? 'Masquée : cliquer pour afficher' : 'Affichée : cliquer pour masquer', onclick: () => { if (s.visible === false) delete s.visible; else s.visible = false; refaire(); } }),
+        avecChemin ? null : [bouton({ ic: 'haut', classe: 'btn--rond btn--discret btn--org', aria: `Monter ${s.nom}`, disabled: i === 0, onclick: () => { bouger(liste, i, -1); refaire(); } }), bouton({ ic: 'bas', classe: 'btn--rond btn--discret btn--org', aria: `Descendre ${s.nom}`, disabled: i === liste.length - 1, onclick: () => { bouger(liste, i, 1); refaire(); } })],
+        bouton({ ic: s.visible === false ? 'oeil-barre' : 'oeil', classe: 'btn--rond btn--discret btn--org', aria: s.visible === false ? `Afficher ${s.nom} sur le site` : `Masquer ${s.nom} du site`, titre: s.visible === false ? 'Masquée : cliquer pour afficher' : 'Affichée : cliquer pour masquer', onclick: () => { if (s.visible === false) delete s.visible; else s.visible = false; refaire(); } }),
         bouton({ ic: 'crayon', classe: 'btn--rond btn--discret', aria: `Modifier ${s.nom}`, onclick: () => modifierService({ u, c, s }, refaire) })));
   }
 
@@ -125,7 +131,7 @@ function modifierService({ u, c, s }, refaire) {
   m = modale({ titre: neuf ? `Nouvelle prestation · ${c.titre}` : 'Modifier la prestation', large: true,
     contenu: (corps) => corps.append(h('form', { class: 'formulaire', novalidate: true, on: { submit: (e) => { e.preventDefault(); enregistrer(); } } },
       champ({ label: 'Nom de la prestation' }, nom), champ({ label: 'Description courte (facultative)', aide: 'Une ligne sous le nom : ce qui est compris, le matériel…' }, detail),
-      h('div', { class: 'champs-ligne' }, champ({ label: 'Prix (€)' }, prix), h('div', { class: 'champ' }, h('span', { class: 'champ__etiquette', text: 'Durée' }), h('div', { class: 'duree' }, heures, h('span', { text: 'h' }), minutes, h('span', { text: 'min' })))),
+      h('div', { class: 'champs-ligne champs-ligne--duree' }, champ({ label: 'Prix (€)' }, prix), h('div', { class: 'champ' }, h('span', { class: 'champ__etiquette', text: 'Durée' }), h('div', { class: 'duree' }, heures, h('span', { text: 'h' }), minutes, h('span', { text: 'min' })))),
       aPartirDe, champ({ label: 'Réservation' }, reservation), champ({ label: 'Étiquette (facultative)', aide: 'Un petit badge à côté du nom.' }, etiquette), datalist, champ({ label: 'Catégorie' }, categories), visible, erreur, h('button', { type: 'submit', hidden: true }))),
     boutons: [
       neuf ? null : bouton({ texte: 'Supprimer', ic: 'corbeille', classe: 'btn--danger-clair', onclick: async () => { if (!(await confirmer({ titre: 'Supprimer cette prestation ?', texte: `« ${s.nom} » sera retirée du site. Vous pourrez toujours la retrouver dans une ancienne version (menu Historique).`, ok: 'Supprimer', danger: true }))) return; c.services.splice(c.services.indexOf(s), 1); S.doc.envies.forEach((e) => { e.l = e.l.filter((x) => x !== s.id); }); S.doc.promotions.forEach((p) => { p.cible.services = p.cible.services.filter((x) => x !== s.id); }); m.fermer(); refaire(); toast('Prestation supprimée (pensez à publier).'); } }),
