@@ -18,10 +18,11 @@
 <link rel="apple-touch-icon" href="assets/img/apple-touch-icon.png">
 <link rel="preload" href="assets/fonts/dm-serif-display-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="assets/fonts/dm-sans-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="preload" href="assets/img/hero-poster.webp" as="image" media="(min-width: 761px)">
+<link rel="preload" href="assets/img/hero-poster.webp" as="image" media="(min-width: 761px)" fetchpriority="high">
+<link rel="preload" href="assets/img/hero-poster-mobile.webp" as="image" media="(max-width: 760px)" fetchpriority="high">
 <link rel="preconnect" href="https://angel-nails-pro.justin070405.workers.dev" crossorigin>
 <link rel="stylesheet" href="assets/vendor/lenis.css">
-<link rel="stylesheet" href="assets/css/style.css?v=9">
+<link rel="stylesheet" href="assets/css/style.css?v=10">
 <script type="application/ld+json" id="ld">{"@context":"https://schema.org","@type":"BeautySalon","name":"Angel Nails Studio","url":"https://angelnailsstudio.fr/","image":"https://angelnailsstudio.fr/assets/img/og.jpg","telephone":"+33613278334","description":"Institut de beauté à Manosque : ongles, massages, cils, épilation, soins du visage.","priceRange":"€","address":{"@type":"PostalAddress","streetAddress":"Rue des Heures Claires, Résidence L’Étoile","postalCode":"04100","addressLocality":"Manosque","addressCountry":"FR"},"geo":{"@type":"GeoCoordinates","latitude":43.8290066,"longitude":5.7871819},"openingHoursSpecification":[{"@type":"OpeningHoursSpecification","dayOfWeek":"Monday","opens":"09:00","closes":"12:00"},{"@type":"OpeningHoursSpecification","dayOfWeek":"Monday","opens":"13:00","closes":"17:45"},{"@type":"OpeningHoursSpecification","dayOfWeek":"Tuesday","opens":"09:00","closes":"12:00"},{"@type":"OpeningHoursSpecification","dayOfWeek":"Tuesday","opens":"13:00","closes":"17:45"},{"@type":"OpeningHoursSpecification","dayOfWeek":"Wednesday","opens":"09:00","closes":"12:00"},{"@type":"OpeningHoursSpecification","dayOfWeek":"Wednesday","opens":"13:00","closes":"17:45"},{"@type":"OpeningHoursSpecification","dayOfWeek":"Thursday","opens":"09:00","closes":"12:00"},{"@type":"OpeningHoursSpecification","dayOfWeek":"Thursday","opens":"13:00","closes":"17:45"},{"@type":"OpeningHoursSpecification","dayOfWeek":"Friday","opens":"09:00","closes":"12:00"},{"@type":"OpeningHoursSpecification","dayOfWeek":"Friday","opens":"13:00","closes":"17:45"},{"@type":"OpeningHoursSpecification","dayOfWeek":"Saturday","opens":"09:30","closes":"12:00"},{"@type":"OpeningHoursSpecification","dayOfWeek":"Saturday","opens":"13:00","closes":"17:00"}],"sameAs":["https://www.planity.com/angel-nails-04100-manosque","https://www.google.com/maps/place/Angel+Nails+Studio/@43.8290066,5.7871819,17z/data=!3m1!4b1!4m6!3m5!1s0x12cbcd44544f18eb:0x9f094c051234e593!8m2!3d43.8290066!4d5.7871819!16s%2Fg%2F11strzvrxw"]}</script>
 </head>
 <body>
@@ -73,7 +74,7 @@
 <!-- ============ héros : film 3D ============ -->
 <section class="hero" id="accueil" aria-labelledby="h1">
   <div class="hero__media">
-    <video class="hero__video" id="film" muted loop playsinline preload="auto" aria-hidden="true" tabindex="-1" poster="assets/img/hero-poster.webp"
+    <video class="hero__video" id="film" muted loop playsinline preload="none" aria-hidden="true" tabindex="-1"
       data-src-d="assets/video/hero.mp4" data-src-m="assets/video/hero-mobile.mp4" data-poster-m="assets/img/hero-poster-mobile.webp"></video>
   </div>
   <div class="hero__shade" aria-hidden="true"></div>
@@ -1195,7 +1196,7 @@
 <script src="assets/vendor/lenis.min.js"></script>
 <script src="assets/js/rendu.js?v=1"></script>
 <script src="assets/js/config.js?v=1"></script>
-<script src="assets/js/main.js?v=3" defer></script>
+<script src="assets/js/main.js?v=4" defer></script>
 <script src="assets/js/pro-live.js?v=1" defer></script>
 </body>
 </html>
